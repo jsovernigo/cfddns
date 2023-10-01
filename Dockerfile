@@ -9,4 +9,4 @@ ENV APIBASE="https://api.cloudflare.com/client/v4"
 
 RUN apk add --update bind-tools curl jq
 
-ENTRYPOINT [ "cfddns.sh" ]
+ENTRYPOINT [ "/etc/cfddns/cfddns.sh" ]

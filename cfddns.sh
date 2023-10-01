@@ -1,12 +1,15 @@
 #!/bin/sh -e
 
-set -x
-
 myip=$(dig +short myip.opendns.com @resolver1.opendns.com)
 path=$(dirname $(realpath $0))
 
 globalkey=$(cat /run/secrets/globalkey)
 accountid=$(cat /run/secrets/accountid)
+
+function hardquit () {
+    exit 0
+}
+trap 'hardquit' SIGINT
 
 function getzone () {
     echo $(curl -X GET "${APIBASE}/zones?name=${DOMAIN}" \

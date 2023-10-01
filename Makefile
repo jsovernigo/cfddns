@@ -5,7 +5,7 @@ all: build run
 
 .PHONY:
 build:
-	docker build -t cfddns .
+	docker-compose build cfddns
 
 .PHONY:
 run:
