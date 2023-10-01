@@ -10,12 +10,9 @@ services:
     secrets:
     - accountid
     - globalkey
-    - token
 
 secrets:
   accountid:
     file: ./accountid
   globalkey:
     file: ./globalkey
-  token:
-    file: ./token

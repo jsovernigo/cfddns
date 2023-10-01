@@ -6,7 +6,6 @@ myip=$(dig +short myip.opendns.com @resolver1.opendns.com)
 path=$(dirname $(realpath $0))
 
 globalkey=$(cat /run/secrets/globalkey)
-token=$(cat /run/secrets/token)
 accountid=$(cat /run/secrets/accountid)
 
 function getzone () {
@@ -34,16 +33,15 @@ TYPE="A";
 NAME=$SUBDOMAIN;
 CONTENT="$myip";
 PROXIED="false";
-TTL="120";
+TTL="600";
 
-result=$(curl -X GET "${APIBASE}/user/tokens/verify" \
-        -H "Authorization: Bearer ${token}" \
-        -H "Content-Type:application/json" 2>/dev/null)
-
-curl -X PUT "${APIBASE}/zones/$zone/dns_records/$dns_id" \
-    -H "X-Auth-email: $EMAIL" \
-    -H "X-Auth-Key: $globalkey" \
-    -H "Content-Type: application/json" \
-    --data '{"type":"'"$TYPE"'","name":"'"$NAME"'","content":"'"$CONTENT"'","proxied":'"$PROXIED"',"ttl":'"$TTL"'}'
-
-#echo "Ran last at $(date)." >> $path/run.log
+while :
+do 
+    curl -X PUT "${APIBASE}/zones/$zone/dns_records/$dns_id" \
+        -H "X-Auth-email: $EMAIL" \
+        -H "X-Auth-Key: $globalkey" \
+        -H "Content-Type: application/json" \
+        --data '{"type":"'"$TYPE"'","name":"'"$NAME"'","content":"'"$CONTENT"'","proxied":'"$PROXIED"',"ttl":'"$TTL"'}'
+    echo "last ran $(date)." >> $path/run.log
+    sleep 10m
+done
