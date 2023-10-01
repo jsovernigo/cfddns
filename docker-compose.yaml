@@ -1,0 +1,21 @@
+version: '3'
+
+services:
+  cfddns:
+    image: cfddns
+    environment:
+      - DOMAIN=${DOMAIN}
+      - SUBDOMAIN=${SUBDOMAIN}
+      - EMAIL=${EMAIL}
+    secrets:
+    - accountid
+    - globalkey
+    - token
+
+secrets:
+  accountid:
+    file: ./accountid
+  globalkey:
+    file: ./globalkey
+  token:
+    file: ./token

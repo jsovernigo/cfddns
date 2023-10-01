@@ -2,12 +2,14 @@
 
 set -x
 
-api_base="https://api.cloudflare.com/client/v4/"
+globalkey=$(cat /run/secrets/globalkey)
 
-key=$(cat global_key)
-EMAIL="juliansovernigo@gmail.com";
+function getzone () {
+     echo $(curl -X GET "${APIBASE}/zones?name=${DOMAIN}" \
+          -H "X-Auth-Email: $EMAIL" \
+          -H "X-Auth-Key: $globalkey" \
+          -H "Content-Type: application/json" | jq -r ".result[$1].id") \
+          | jq
+}
 
-curl -X GET "https://api.cloudflare.com/client/v4/zones?name=sovernigo.ca" \
-     -H "X-Auth-Email: $EMAIL" \
-     -H "X-Auth-Key: $key" \
-     -H "Content-Type: application/json"
+gezone $0
