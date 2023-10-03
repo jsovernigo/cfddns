@@ -9,7 +9,7 @@ build:
 
 .PHONY:
 run:
-	docker-compose run cfddns
+	docker-compose run cfddns -d
 
 .PHONY:
 clean:
