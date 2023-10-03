@@ -1,7 +1,7 @@
 all: build run
 
 .env:
-	! test -f '.env' && echo "DOMAIN=\nSUBDOMAIN=\nEMAIL=\n" > .env
+	! test -f '.env' && echo "DOMAIN=\nSUBDOMAIN=\n" > .env
 
 .PHONY:
 build:
