@@ -170,10 +170,10 @@ while True:
 
         # if this record exists we can update it.
         if ipv4_record_id:
-            ipv4_record_id = update_dns_record(zone, SUBDOMAIN, 'A', ipv4, ipv4_record_id)   
+            ipv4_record_id = update_dns_record(zone, SUBDOMAIN, 'A', ipv4, ipv4_record_id, ttl)
         else:
             logging.warning(f"No 'A' dns record exists for {SUBDOMAIN}.{DOMAIN}")
-            ipv4_record_id = create_new_dns_record(zone, SUBDOMAIN, 'A', ipv4)
+            ipv4_record_id = create_new_dns_record(zone, SUBDOMAIN, 'A', ipv4, ttl)
     
     if ipv6:
         data = {
@@ -185,10 +185,10 @@ while True:
         }
 
         if ipv6_record_id:
-            ipv6_record_id = update_dns_record(zone, SUBDOMAIN, 'AAAA', ipv6, ipv6_record_id)   
+            ipv6_record_id = update_dns_record(zone, SUBDOMAIN, 'AAAA', ipv6, ipv6_record_id, ttl)   
         else:
             logging.warning(f"No 'AAAA' dns record exists for {SUBDOMAIN}.{DOMAIN}")
-            ipv6_record_id = create_new_dns_record(zone, SUBDOMAIN, 'AAAA', ipv6)
+            ipv6_record_id = create_new_dns_record(zone, SUBDOMAIN, 'AAAA', ipv6, ttl)
         
 
     time.sleep(600)  # 10 minutes
