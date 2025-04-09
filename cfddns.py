@@ -17,13 +17,12 @@ dotenv.load_dotenv()
 APIBASE = os.environ.get('APIBASE')
 DOMAIN = os.environ.get('DOMAIN')
 SUBDOMAIN = os.environ.get('SUBDOMAIN')
-ACCOUNTID = os.environ.get('ACCOUNTID')
 TOKEN = os.environ.get('TOKEN')
 
 ttl = 600
 
 headers = {
-    'Authorization': f'Bearer {token}',
+    'Authorization': f'Bearer {TOKEN}',
     'Content-Type': 'application/json'
 }
 
@@ -112,24 +111,24 @@ def update_dns_record(zone_id, subdomain, type, addr, record_id, ttl):
 # retrieve global scope ipv4 and ipv6 addresses if possible, and log what is unavailable.
 ipv4, ipv6 = get_supported_ip_addresses()
 
-# if no ipv4/ipv6 addresses were reachable, no point continuing.
-if not ipv4 and not ipv6:
-    logging.error("No valid ipv4 or ipv6 addresses are available on this network. Shutting down.")
-    exit(1)
-
 # we must retrieve the zone for the domain provided in the environment. It may not exist.
 if not (zone := get_zone(DOMAIN)):
     logging.error(f"No zone exists for {DOMAIN}, exiting.")
     exit(1)
 
-# Retrieve ids for the ipv4 and ipv6 dns records (or None if they don't exist.)
-ipv4_record_id = get_dns_record(zone, DOMAIN, SUBDOMAIN, 'A')
-ipv6_record_id = get_dns_record(zone, DOMAIN, SUBDOMAIN, 'AAAA')
-
 while True:
+
+    # Retrieve ids for the ipv4 and ipv6 dns records (or None if they don't exist.)
+    ipv4_record_id = get_dns_record(zone, DOMAIN, SUBDOMAIN, 'A')
+    ipv6_record_id = get_dns_record(zone, DOMAIN, SUBDOMAIN, 'AAAA')
 
     # retrieve in a loop in case of isp address reassignment during uptime.
     ipv4, ipv6 = get_supported_ip_addresses()
+
+    # if no ipv4/ipv6 addresses were reachable, no point continuing.
+    if not ipv4 and not ipv6:
+        logging.error("No valid ipv4 or ipv6 addresses are available on this network. Shutting down.")
+        exit(1)
 
     if ipv4:
         data = {
