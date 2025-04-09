@@ -17,10 +17,10 @@ logging.basicConfig(
 path = Path(__file__).resolve().parent
 
 # Load secrets
-with open('run/secrets/accountid') as f:
+with open('/run/secrets/accountid') as f:
     accountid = f.read().strip()
 
-with open('run/secrets/token') as f:
+with open('/run/secrets/token') as f:
     token = f.read().strip()
 
 dotenv.load_dotenv()
