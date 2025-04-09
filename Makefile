@@ -5,11 +5,11 @@ all: build run
 
 .PHONY:
 build:
-	docker-compose build cfddns
+	docker-compose build 
 
 .PHONY:
 run:
-	docker-compose run cfddns -d
+	docker-compose up -d 
 
 .PHONY:
 clean:
