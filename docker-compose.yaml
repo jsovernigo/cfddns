@@ -1,18 +1,6 @@
-version: '3.1'
+version: '3'
 
 services:
   cfddns:
     build: .
     image: cfddns
-    environment:
-      - DOMAIN=${DOMAIN}
-      - SUBDOMAIN=${SUBDOMAIN}
-    secrets:
-    - accountid
-    - token
-
-secrets:
-  accountid:
-    file: ./accountid
-  token:
-    file: ./token
