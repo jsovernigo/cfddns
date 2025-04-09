@@ -5,7 +5,6 @@ import requests
 import time
 import logging
 import dotenv
-from pathlib import Path
 
 logging.basicConfig(
     filename='run.log',
@@ -13,10 +12,6 @@ logging.basicConfig(
     format='[%(asctime)s] %(levelname)s - %(message)s'
 )
 
-# Set working path
-path = Path(__file__).resolve().parent
-
-# Load secrets
 with open('/run/secrets/accountid') as f:
     accountid = f.read().strip()
 
@@ -25,7 +20,6 @@ with open('/run/secrets/token') as f:
 
 dotenv.load_dotenv()
 
-# Environment variables expected to be set
 APIBASE = os.environ.get('APIBASE')
 DOMAIN = os.environ.get('DOMAIN')
 SUBDOMAIN = os.environ.get('SUBDOMAIN')
@@ -121,7 +115,7 @@ def update_dns_record(zone_id, subdomain, type, addr, record_id, ttl):
     # fallback case - maybe the ID changed or was deleted?
     return None
 
-# first - retrieve global scope ipv4 and ipv6 addresses if possible, and log what is unavailable.
+# retrieve global scope ipv4 and ipv6 addresses if possible, and log what is unavailable.
 ipv4, ipv6 = get_supported_ip_addresses()
 
 # if no ipv4/ipv6 addresses were reachable, no point continuing.
@@ -137,12 +131,10 @@ if not (zone := get_zone(DOMAIN)):
 ipv4_record_id = None
 ipv6_record_id = None
 
-# discover and assign the ipv4 record if it exists, otherwise attempt to create it.
 if ipv4 and not (ipv4_record_id := get_dns_record(zone, DOMAIN, SUBDOMAIN, 'A')):
     logging.warning(f"No 'A' dns record exists for {SUBDOMAIN}.{DOMAIN}")
     ipv4_record_id = create_new_dns_record(zone, SUBDOMAIN, 'A', ipv4, ttl)
 
-# discover and assign the ipv6 record if it exists, otherwise attempt to create it.
 if ipv6 and not (ipv6_record_id := get_dns_record(zone, DOMAIN, SUBDOMAIN, 'AAAA')):
     logging.warning(f"No 'AAAA' dns record exists for {SUBDOMAIN}.{DOMAIN}")
     ipv6_record_id = create_new_dns_record(zone, SUBDOMAIN, 'AAAA', ipv6, ttl)
@@ -153,7 +145,6 @@ if not ipv4_record_id and ipv6_record_id:
     exit(1)
 
 
-# Update DNS in a loop
 while True:
 
     # retrieve in a loop in case of isp address reassignment during uptime.
