@@ -12,17 +12,13 @@ logging.basicConfig(
     format='[%(asctime)s] %(levelname)s - %(message)s'
 )
 
-with open('/run/secrets/accountid') as f:
-    accountid = f.read().strip()
-
-with open('/run/secrets/token') as f:
-    token = f.read().strip()
-
 dotenv.load_dotenv()
 
 APIBASE = os.environ.get('APIBASE')
 DOMAIN = os.environ.get('DOMAIN')
 SUBDOMAIN = os.environ.get('SUBDOMAIN')
+ACCOUNTID = os.environ.get('ACCOUNTID')
+TOKEN = os.environ.get('TOKEN')
 
 ttl = 600
 
