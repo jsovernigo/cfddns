@@ -1,12 +1,12 @@
-FROM alpine
+FROM python:3
 
 RUN mkdir /etc/cfddns
 WORKDIR /etc/cfddns
 
-ADD ./cfddns.sh /etc/cfddns/
+RUN pip install requests dotenv
 
-ENV APIBASE="https://api.cloudflare.com/client/v4"
+ADD .env /etc/cfddns/
 
-RUN apk add --update bind-tools curl jq
+ADD ./cfddns.py /etc/cfddns/
 
-ENTRYPOINT [ "/etc/cfddns/cfddns.sh" ]
+ENTRYPOINT [ "python", "/etc/cfddns/cfddns.py" ]
