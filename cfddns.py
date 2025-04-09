@@ -108,12 +108,10 @@ def update_dns_record(zone_id, subdomain, type, addr, record_id, ttl):
             logging.info(f"Updated {type} record for {SUBDOMAIN}.{DOMAIN} to {ipv4}")
         else:
             logging.warning(f"Failed to update {type} record for {SUBDOMAIN}.{DOMAIN} with status code {response.status_code}. Error: {response.reason} ")
-        return record_id
+
     except Exception as e:
         logging.error(f"Unable to reach {url}: {e}")
 
-    # fallback case - maybe the ID changed or was deleted?
-    return None
 
 # retrieve global scope ipv4 and ipv6 addresses if possible, and log what is unavailable.
 ipv4, ipv6 = get_supported_ip_addresses()
@@ -128,22 +126,9 @@ if not (zone := get_zone(DOMAIN)):
     logging.error(f"No zone exists for {DOMAIN}, exiting.")
     exit(1)
 
-ipv4_record_id = None
-ipv6_record_id = None
-
-if ipv4 and not (ipv4_record_id := get_dns_record(zone, DOMAIN, SUBDOMAIN, 'A')):
-    logging.warning(f"No 'A' dns record exists for {SUBDOMAIN}.{DOMAIN}")
-    ipv4_record_id = create_new_dns_record(zone, SUBDOMAIN, 'A', ipv4, ttl)
-
-if ipv6 and not (ipv6_record_id := get_dns_record(zone, DOMAIN, SUBDOMAIN, 'AAAA')):
-    logging.warning(f"No 'AAAA' dns record exists for {SUBDOMAIN}.{DOMAIN}")
-    ipv6_record_id = create_new_dns_record(zone, SUBDOMAIN, 'AAAA', ipv6, ttl)
-
-# if neither record id was assigned, something went terribly wrong - unrecoverable, we must exit.
-if not ipv4_record_id and ipv6_record_id:
-    logging.error(f"Unable to retrieve or create records for {SUBDOMAIN}.{DOMAIN}. Exiting.")
-    exit(1)
-
+# Retrieve ids for the ipv4 and ipv6 dns records (or None if they don't exist.)
+ipv4_record_id = get_dns_record(zone, DOMAIN, SUBDOMAIN, 'A')
+ipv6_record_id = get_dns_record(zone, DOMAIN, SUBDOMAIN, 'AAAA')
 
 while True:
 
@@ -161,7 +146,7 @@ while True:
 
         # if this record exists we can update it.
         if ipv4_record_id:
-            ipv4_record_id = update_dns_record(zone, SUBDOMAIN, 'A', ipv4, ipv4_record_id, ttl)
+            update_dns_record(zone, SUBDOMAIN, 'A', ipv4, ipv4_record_id, ttl)
         else:
             logging.warning(f"No 'A' dns record exists for {SUBDOMAIN}.{DOMAIN}")
             ipv4_record_id = create_new_dns_record(zone, SUBDOMAIN, 'A', ipv4, ttl)
@@ -176,10 +161,14 @@ while True:
         }
 
         if ipv6_record_id:
-            ipv6_record_id = update_dns_record(zone, SUBDOMAIN, 'AAAA', ipv6, ipv6_record_id, ttl)   
+            update_dns_record(zone, SUBDOMAIN, 'AAAA', ipv6, ipv6_record_id, ttl)   
         else:
             logging.warning(f"No 'AAAA' dns record exists for {SUBDOMAIN}.{DOMAIN}")
             ipv6_record_id = create_new_dns_record(zone, SUBDOMAIN, 'AAAA', ipv6, ttl)
-        
+
+    # if neither record id was assigned in this loop, something went terribly wrong - unrecoverable, we must exit.
+    if not ipv4_record_id and ipv6_record_id:
+        logging.error(f"Unable to update or create records for {SUBDOMAIN}.{DOMAIN}. Exiting.")
+        exit(1)
 
     time.sleep(600)  # 10 minutes
