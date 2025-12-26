@@ -1,8 +1,10 @@
 all: build run
 
 .env:
-	! test -f '.env' && echo "DOMAIN=\nSUBDOMAIN=\nAPIBASE="https://api.cloudflare.com/client/v4"\nTOKEN=" > .env
+	! test -f '.env' && echo "DOMAIN=\nSUBDOMAINS=\nAPIBASE="https://api.cloudflare.com/client/v4"\nTOKEN=" > .env
         
+cfddns:
+	rustc main.rs
 
 .PHONY:
 build:

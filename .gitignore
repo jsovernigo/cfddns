@@ -2,3 +2,8 @@ accountid
 token
 .env
 run.log
+
+
+# Added by cargo
+
+/target
