@@ -3,7 +3,8 @@ use reqwest::header::{AUTHORIZATION, CONTENT_TYPE, HeaderMap, HeaderValue};
 use reqwest::blocking::{Client};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use core::{panic, time};
+use core::time;
+use std::time::Duration;
 use std::{env};
 use std::collections::{HashSet, HashMap};
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
@@ -70,11 +71,9 @@ struct DnsRecordUpdate {
     pub proxied: bool
 }
 
-/**
- * split_subdomain
- * collect the list of subdomains this instance will operate on - it needs
- * to split up an empty list into an empty hashset, and a valid list
- * into a hashset of subdomains we will be updating the records for.  */
+/// split_subdomain
+/// Parses a comma-separated string of subdomains into a HashSet.
+/// Returns an empty HashSet if the input string is empty.
 fn split_subdomain(subdomains: &str) -> HashSet<&str> {
     if subdomains.is_empty() {
         HashSet::new()
@@ -83,24 +82,27 @@ fn split_subdomain(subdomains: &str) -> HashSet<&str> {
     }
 }
 
-/**
- * query_ip_providers
- * This function will query the provided list of IP checking providers in order to determine our
- * current public ip address. Among the n providers, there must be consensus for a successful result
- * to be returned.
- */
+/// query_ip_providers
+/// Queries multiple IP checking providers to determine the current public IP address.
+/// Requires consensus among all reachable providers to return a successful result.
+/// Returns an error if providers disagree or if none are reachable.
 fn query_ip_providers(
+    provider_client: &reqwest::blocking::Client,
     providers: &[&str]
 ) -> Result<IpAddr, IpQueryError> {
 
     let mut addr: Option<IpAddr> = None;
+
+    let min_agreement = 2;
+    let mut n_agreement = 0;
+
 
     for &provider_url in providers {
 
         info!("Querying provider {provider_url}");
 
         /* in a case where a provider is unreachable, just abort. */
-        let response = match reqwest::blocking::get(provider_url) {
+        let response = match provider_client.get(provider_url) {
             Ok(resp) => resp,
 
             /* this is an error that needs logging. */
@@ -139,25 +141,32 @@ fn query_ip_providers(
                     });
                 }             
             },
-            None => addr = Some(new_ip)
+            None => {
+                addr = Some(new_ip);
+                n_agreement += 1;
+            }
         } 
     }
 
-    if let Some(ip) = addr {
+    if let Some(ip) = addr && n_agreement > min_agreement {
         return Ok(ip);
     }
 
     return Err(IpQueryError::NoIpAvailable { reason: "No providers were reachable." });
 }
 
-/**
- * query_with_retries
- * This is a wrapper function around the query_ip_providers function which allows for a retry
- * mechanism to prevent short-term consensus from causing an issue.
- */
-fn query_with_retries(providers: &[&str], retries: usize) -> Option<IpAddr> {
+/// query_with_retries
+/// Wrapper around query_ip_providers that implements a retry mechanism.
+/// Attempts to query providers up to the specified number of retries.
+/// Returns None if all retry attempts fail.
+fn query_with_retries(
+    provider_client: &reqwest::blocking::Client(),
+    providers: &[&str], 
+    retries: usize
+) -> Option<IpAddr> {
+
     for _ in 0..retries {
-        let result =  query_ip_providers(providers);
+        let result =  query_ip_providers(client, providers);
 
         if let Ok(addr) = result {
             return Some(addr);
@@ -179,25 +188,25 @@ fn query_with_retries(providers: &[&str], retries: usize) -> Option<IpAddr> {
     return None
 }
 
-/**
- * get_supported_public_ips
- * this function queries the list of providers in v4 and v6 providers according
- * to the number of retries, and then 
- */
+/// get_supported_public_ips
+/// Queries both IPv4 and IPv6 provider lists to determine supported public IP addresses.
+/// Returns a tuple of (Option<Ipv4Addr>, Option<Ipv6Addr>) where either or both may be None
+/// if the respective IP version is not available or consensus cannot be reached.
 fn get_supported_public_ips(
+    provider_client: &reqwest::blocking::Client,
     v4_providers: &[&str], 
     v6_providers: &[&str], 
     retries: usize
 ) -> (Option<Ipv4Addr>, Option<Ipv6Addr>) {
 
-    let ipv4 = query_with_retries(v4_providers, retries)
+    let ipv4 = query_with_retries(provider_client, v4_providers, retries)
         .and_then(|ip| match ip {
             IpAddr::V4(v4) => Some(v4),
             IpAddr::V6(_) => None,
         }
     );
 
-    let ipv6 = query_with_retries(v6_providers, retries)
+    let ipv6 = query_with_retries(provider_client, v6_providers, retries)
         .and_then(|ip| match ip {
             IpAddr::V4(_) => None,
             IpAddr::V6(v6) => Some(v6),
@@ -208,14 +217,10 @@ fn get_supported_public_ips(
     (ipv4, ipv6)
 }
 
-/**
- * cloudflare_get_zone_id
- * This function collects the zone_id for the specified domain using a pre-arranged header
- * with a token from cloudflare, taken from the environment file. 
- * 
- * it will return a String of the zone id, extracted from the matching result in the json
- * specified by the domain name.
- */
+/// cloudflare_get_zone_id
+/// Retrieves the Cloudflare zone ID for the specified domain.
+/// Queries the Cloudflare API zones endpoint and extracts the zone ID from the matching result.
+/// Returns an error if the domain is not registered with Cloudflare or if the API request fails.
 fn cloudflare_get_zone_id(
     apibase: &str, 
     cloudflare_client: &Client, 
@@ -262,14 +267,10 @@ fn cloudflare_get_zone_id(
     Ok(zone_id)
 }
 
-/**
- * cloudflare_get_dns_record_id
- * This function connects to the cloudflare zone/dns_records api and collects
- * the dns record ids for any subdomains registered with this zone.
- * 
- * The returned result will either have a cloudflareapierror or a vector of
- * DnsRecords (note the vector may be empty if no records exist)
- */
+/// cloudflare_get_dns_record_id
+/// Retrieves all DNS records for a specific full domain name within a Cloudflare zone.
+/// Returns a vector of DnsRecord structs, which may be empty if no records exist.
+/// The vector can contain both A and AAAA records for the same domain.
 fn cloudflare_get_dns_record_id(
     apibase: &str, 
     cloudflare_client: &Client, 
@@ -315,15 +316,10 @@ fn cloudflare_get_dns_record_id(
     Ok(dns_records)
 }
 
-/**
- * create_update_records_from_ip_set
- * A small helper function to clean up code creating records for updates.
- * 
- * returns a vector of DnsRecordUpdate structs used to update the cloudflare record
- * for a certain domain - because there are both A and AAAA records, but we don't want
- * to split up the calls to the API, we create a vector of structures, and then
- * serialize them later in the Post or Put call.
- */
+/// create_update_records_from_ip_set
+/// Generates a DnsRecordUpdate struct for either an A (IPv4) or AAAA (IPv6) record.
+/// The record type is determined automatically based on the IP address type.
+/// Used to prepare record data for Cloudflare API update or create operations.
 fn generate_dns_record(
     ip: &IpAddr,
     full_name: String,
@@ -348,13 +344,10 @@ fn generate_dns_record(
     }
 }
 
-/**
- * cloudflare_create_new_dns_record
- * this function will create a new dns record for the specified domain in a case
- * where one does not already exist.
- * 
- * on success it returns the id of the new record as a string.
- */
+/// cloudflare_create_new_dns_record
+/// Creates a new DNS record in Cloudflare for the specified domain and IP address.
+/// Returns the ID of the newly created record on success.
+/// Returns an error if the API request fails or if Cloudflare returns success=false.
 fn cloudflare_create_new_dns_record(
     apibase: &str,
     cloudflare_client: &Client,
@@ -399,9 +392,10 @@ fn cloudflare_create_new_dns_record(
     Ok(record.id)
 }
 
-/**
- * 
- */
+/// cloudflare_update_dns_record
+/// Updates an existing DNS record in Cloudflare with a new IP address.
+/// Returns true if the update was successful (Cloudflare returned success=true).
+/// Returns false or an error if the update failed.
 fn cloudflare_update_dns_record(
     apibase: &str,
     cloudflare_client: &Client,
@@ -434,15 +428,10 @@ fn cloudflare_update_dns_record(
     Ok(success)
 }
 
-/**
- * update_or_create_record
- * A helper function to abstract the creation or deletion of a record away to simplify main.
- * This function will take in a full domain name and an ip, check if a record exists, and then
- * create it if it does not. Otherwise, if the record does exist, we update it.
- * 
- * Upon completion, it will return a tuple of the success of the action as well as a new id if
- * record creation was needed.
- */
+/// update_or_create_record
+/// Updates an existing DNS record or creates a new one if it doesn't exist.
+/// Returns a tuple of (success: bool, new_id: Option<String>) where new_id is Some
+/// only if a new record was created. Logs errors if the operation fails.
 fn update_or_create_record(
     apibase: &str,
     cloudflare_client: &Client, 
@@ -497,12 +486,11 @@ fn update_or_create_record(
     }
 }
 
-/**
- * update_dns_record
- * This wrapper function handles the updating and caching of dns records
- * in the cloudflare api. It can be called with ip as either an Ipv4Addr
- * or an Ipv6Addr, and will create the records accordingly.
- */
+/// update_dns_record
+/// High-level wrapper that handles DNS record updates and caches record IDs.
+/// Automatically determines whether to update or create a record based on the cache.
+/// Updates the known_ids HashMap with new record IDs when records are created.
+/// Returns true if the operation succeeded, false otherwise.
 fn update_dns_record(
     apibase: &str,
     client: &Client,
@@ -575,6 +563,8 @@ fn main() {
 
     let cloudflare_client = reqwest::blocking::Client::builder()
         .default_headers(cfclient_headers)
+        .timeout(Duration::from_secs(10))
+        .connect_timeout(Duration::from_secs(5))
         .build()
         .expect("The client should be able to build.");
 
@@ -625,6 +615,12 @@ fn main() {
     /* Do not collect ip - we must check this on the first iteration of the update loop. */
     let (mut ipv4_cache, mut ipv6_cache) = (None, None);
 
+    let ipquery_client = reqwest::blocking::Client::builder()
+        .timeout(Duration::from_secs(10))
+        .connect_timeout(Duration::from_secs(5))
+        .build()
+        .expect("The client should be able to build.");
+
     let max_failures = 5;
     let mut failure_count = 0;
 
@@ -636,7 +632,7 @@ fn main() {
         let mut cycle_failed: bool = false;
 
         /* TODO: detect any changes on the network device (netlink, etc) */
-        let (ipv4, ipv6) = get_supported_public_ips(IPV4_SERVICES, IPV6_SERVICES, retries);
+        let (ipv4, ipv6) = get_supported_public_ips(ipquery_client, IPV4_SERVICES, IPV6_SERVICES, retries);
 
         /* update v4 if needed. */
         let update_v4 = if ipv4_cache != ipv4 {
@@ -656,7 +652,7 @@ fn main() {
             false
         };
 
-        if ipv4_cache.is_none() && ipv4_cache.is_none() {
+        if ipv4_cache.is_none() && ipv6_cache.is_none() {
             warn!("No valid ip addresses were available during this cycle. Failures incremented! ({failure_count})");
             cycle_failed = true;
         } else if !update_v4 && !update_v6 {
