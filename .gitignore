@@ -2,3 +2,9 @@ accountid
 token
 .env
 run.log
+.vscode
+
+
+# Added by cargo
+
+/target

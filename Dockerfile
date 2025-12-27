@@ -1,12 +1,20 @@
-FROM python:3-slim
+# build stage
+FROM rust:1.92 as builder
 
-RUN mkdir /etc/cfddns
 WORKDIR /etc/cfddns
 
-RUN pip install requests dotenv
+COPY Cargo.toml Cargo.lock ./
 
-ADD .env /etc/cfddns/
+RUN mkdir src && echo "fn main() {}" > src/main.rs && cargo build --release && rm -rf src
 
-ADD ./cfddns.py /etc/cfddns/
+COPY src ./src
+RUN cargo build --release
 
-ENTRYPOINT [ "python", "/etc/cfddns/cfddns.py" ]
+# runtime
+FROM debian:bookworm-slim
+
+WORKDIR /etc/cfddns
+
+COPY --from=builder /etc/cfddns/target/release/cfddns /etc/cfddns/cfddns
+
+ENTRYPOINT [ "/etc/cfddns/cfddns" ]
