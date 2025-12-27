@@ -3,7 +3,6 @@ use reqwest::header::{AUTHORIZATION, CONTENT_TYPE, HeaderMap, HeaderValue};
 use reqwest::blocking::{Client};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use core::time;
 use std::time::Duration;
 use std::{env};
 use std::collections::{HashSet, HashMap};
@@ -149,7 +148,7 @@ fn query_ip_providers(
         } 
     }
 
-    if let Some(ip) = addr && n_agreement > min_agreement {
+    if let Some(ip) = addr && n_agreement >= min_agreement {
         return Ok(ip);
     }
 
@@ -200,6 +199,7 @@ fn get_supported_public_ips(
     retries: usize
 ) -> (Option<Ipv4Addr>, Option<Ipv6Addr>) {
 
+    info!("Querying providers for IPV4.");
     let ipv4 = query_with_retries(provider_client, v4_providers, retries)
         .and_then(|ip| match ip {
             IpAddr::V4(v4) => Some(v4),
@@ -207,6 +207,7 @@ fn get_supported_public_ips(
         }
     );
 
+    info!("Querying providers for IPV6.");
     let ipv6 = query_with_retries(provider_client, v6_providers, retries)
         .and_then(|ip| match ip {
             IpAddr::V4(_) => None,
@@ -583,7 +584,7 @@ fn main() {
     let mut known_dns_ids: HashMap<(String, String), String> = HashMap::new();
 
     /* we pre-populate the ids in the hashmap for each subdomain. */
-    for subdomain in subdomains.clone() {
+    for subdomain in &subdomains {
         let full_domain = format!("{subdomain}.{domain}");
 
         info!("Checking for subdomain {full_domain}...");
@@ -654,11 +655,13 @@ fn main() {
         };
 
         if ipv4_cache.is_none() && ipv6_cache.is_none() {
-            warn!("No valid ip addresses were available during this cycle. Failures incremented! ({failure_count})");
             cycle_failed = true;
+            warn!("No valid ip addresses were available during this cycle. Failures incremented! ({failure_count})");
+
         } else if !update_v4 && !update_v6 {
-            info!("Cached IPs are still valid. No updates will occur this cycle.");
             cycle_failed = false;
+            info!("Cached IPs are still valid. No updates will occur this cycle.");
+
         } else {
             /* For each of our subdomains, we need to send separate records for each of A and AAAA. */
             for subdomain in &subdomains {
@@ -704,8 +707,9 @@ fn main() {
         3. other errors occurred etc.
         we incremement the failure count. */
         if cycle_failed {
-            warn!("Cycle failed to update one or more records. Failures incremented! ({failure_count})");
             failure_count += 1;
+            warn!("Cycle failed to update one or more records. Failures incremented! ({failure_count})");
+
         } else {
             /* on a success, however, we clear it. */
             failure_count = 0;
@@ -714,13 +718,13 @@ fn main() {
         /* exponential backoff - we may have a problem here! */
         if failure_count > max_failures {
             warn!("Failures exceeded max failures - sleeping for 5 cycles.");
-            sleep(time::Duration::from_secs(sleep_time * 5));
+            sleep(std::time::Duration::from_secs(sleep_time * 5));
         } else {
             /* we only want to rest roughly as long as a record ttl,
             since if our ip changes during that time, the cache will 
             probably have expired. */
             info!("Cycle finished, sleeping.");
-            sleep(time::Duration::from_secs(sleep_time));
+            sleep(std::time::Duration::from_secs(sleep_time));
         }
     }
 }
