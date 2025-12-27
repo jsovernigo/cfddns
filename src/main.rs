@@ -102,7 +102,7 @@ fn query_ip_providers(
         info!("Querying provider {provider_url}");
 
         /* in a case where a provider is unreachable, just abort. */
-        let response = match provider_client.get(provider_url) {
+        let response = match provider_client.get(provider_url).send() {
             Ok(resp) => resp,
 
             /* this is an error that needs logging. */
@@ -140,6 +140,7 @@ fn query_ip_providers(
                         conflict: new_ip,
                     });
                 }             
+                n_agreement += 1;
             },
             None => {
                 addr = Some(new_ip);
@@ -160,13 +161,13 @@ fn query_ip_providers(
 /// Attempts to query providers up to the specified number of retries.
 /// Returns None if all retry attempts fail.
 fn query_with_retries(
-    provider_client: &reqwest::blocking::Client(),
+    provider_client: &reqwest::blocking::Client,
     providers: &[&str], 
     retries: usize
 ) -> Option<IpAddr> {
 
     for _ in 0..retries {
-        let result =  query_ip_providers(client, providers);
+        let result = query_ip_providers(provider_client, providers);
 
         if let Ok(addr) = result {
             return Some(addr);
@@ -632,7 +633,7 @@ fn main() {
         let mut cycle_failed: bool = false;
 
         /* TODO: detect any changes on the network device (netlink, etc) */
-        let (ipv4, ipv6) = get_supported_public_ips(ipquery_client, IPV4_SERVICES, IPV6_SERVICES, retries);
+        let (ipv4, ipv6) = get_supported_public_ips(&ipquery_client, IPV4_SERVICES, IPV6_SERVICES, retries);
 
         /* update v4 if needed. */
         let update_v4 = if ipv4_cache != ipv4 {
