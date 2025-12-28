@@ -1,6 +1,6 @@
 # CFDDNS
 
-A simple docker-wrapped Python script to turn a cloudflare free account into a dynamic DNS.
+A docker-wrapped rust program to turn a cloudflare free account into a dynamic DNS.
 
 ## Requirements
 - cloudflare account

@@ -4,3 +4,9 @@ services:
   cfddns:
     build: .
     image: cfddns
+    container_name: cfddns
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      - RUST_LOG=info
