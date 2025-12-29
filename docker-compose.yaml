@@ -6,6 +6,7 @@ services:
     image: cfddns
     container_name: cfddns
     restart: unless-stopped
+    network_mode: host
     env_file:
       - .env
     environment:
