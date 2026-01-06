@@ -5,7 +5,6 @@ A docker-wrapped rust program to turn a cloudflare free account into a dynamic D
 ## Requirements
 - cloudflare account
 - domain registered under the cloudflare dns for your zone
-- python
 - docker
 - docker-compose
 
