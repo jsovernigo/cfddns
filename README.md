@@ -15,8 +15,6 @@ Untested on Windows.
 
 Follow these steps for an easy setup:
 1. run `make .env`, fill it out with the correct data.
-2. navigate to dash.cloudflare.com, log in.
-    - create and collect an API token under the api token section. record this; it won't be shown again.
-3. create a file in the base directory of the project called `token`, put your api token from step 2.1 into it.
-4. run `make build`
-5. run `make run`
+    - to obtain your token, create and collect an API token on your Cloudflare dashboard.
+3. run `make build`
+4. run `make run`
